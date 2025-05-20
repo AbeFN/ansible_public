@@ -2,7 +2,7 @@
 
 A step-by-step, production-ready Ansible solution for provisioning Debian/Ubuntu VMs, performing first-boot configuration, and joining them to Active Directory, with Discord notifications. Designed for vSphere (VMware) environments.
 
-**Keywords:** ansible, debian, ubuntu, vmware, vsphere, active directory, domain join, automation, discord, sssd, devops, provisioning
+
 
 ---
 
@@ -194,3 +194,5 @@ MIT License. See [LICENSE](LICENSE) for details.
 - In GitHub, add topics/tags like: `ansible`, `debian`, `ubuntu`, `vmware`, `active-directory`, `automation`, `provisioning`.
 - Write a concise project description in GitHub settings.
 - Share your repo on relevant forums or communities.
+
+- **Keywords:** ansible, debian, ubuntu, vmware, vsphere, active directory, domain join, automation, discord, sssd, devops, provisioning
