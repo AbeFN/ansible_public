@@ -1,0 +1,13 @@
+[Unit]
+Description=Join domain on second boot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/domainjoin.env
+ExecStart=/usr/local/bin/domain_join.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

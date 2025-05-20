@@ -1,0 +1,42 @@
+---
+- name: Post-Reboot Domain Join Tasks
+  hosts: new_vm
+  become: true
+  gather_facts: true
+
+  vars:
+    new_vm_fqdn: "{{ hostvars[inventory_hostname].new_vm_fqdn | default('') }}"
+    domain_password: "{{ domain_password | default('') }}"
+
+  tasks:
+    - name: Create domain join environment file
+      copy:
+        dest: /etc/domainjoin.env
+        content: |
+          DOMAIN_PASSWORD={{ domain_password }}
+          FQDN_HOSTNAME={{ new_vm_fqdn }}
+        mode: '0600'
+
+    - name: Wait for SSH connection to be ready
+      wait_for_connection:
+        timeout: 300
+
+    - name: Start domain join service
+      systemd:
+        name: domainjoin.service
+        state: started
+
+    - name: Wait for domain join log
+      wait_for:
+        path: /var/log/domain_join.log
+        search_regex: "Domain join script completed"
+        timeout: 300
+
+    - name: Output domain join log tail
+      shell: tail -n 20 /var/log/domain_join.log
+      register: log_tail
+      changed_when: false
+
+    - name: Show domain join status
+      debug:
+        msg: "{{ log_tail.stdout_lines | default(['Domain join log not found']) }}"

@@ -1,0 +1,129 @@
+---
+- name: Clone and Provision New Debian VM (First Boot Setup)
+  hosts: localhost
+  gather_facts: false
+
+  vars_prompt:
+    - name: "vcenter_password"
+      prompt: "Enter vCenter password for your vSphere user"
+      private: yes
+
+    - name: "new_vm_name"
+      prompt: "Enter a name for the new VM (short, no domain)"
+      private: no
+
+  tasks:
+    - name: Set FQDN for VM
+      set_fact:
+        new_vm_fqdn: "{{ new_vm_name }}.yourdomain.com"
+
+    - name: Clone the VM from template and wait for IP
+      community.vmware.vmware_guest:
+        hostname: <VCENTER_HOST>
+        username: <VCENTER_USER>
+        password: "{{ vcenter_password }}"
+        validate_certs: no
+        datacenter: <YOUR_DATACENTER>
+        folder: <YOUR_FOLDER>
+        name: "{{ new_vm_name }}"
+        template: <YOUR_TEMPLATE>
+        state: poweredon
+        wait_for_ip_address: true
+      register: clone_vm
+
+    - name: Set IP from clone result or fallback
+      set_fact:
+        new_vm_ip: "{{ clone_vm.instance.hw_eth0.ipaddresses[0] | default(omit) }}"
+      when: clone_vm.instance.hw_eth0.ipaddresses is defined
+
+    - name: Prompt for IP if not detected
+      pause:
+        prompt: "Enter the IP address manually (if auto-detection failed):"
+      register: manual_ip
+      when: new_vm_ip is not defined
+
+    - name: Use fallback IP
+      set_fact:
+        new_vm_ip: "{{ manual_ip.user_input }}"
+      when: new_vm_ip is not defined
+
+    - name: Wait for SSH to come online
+      wait_for:
+        host: "{{ new_vm_ip }}"
+        port: 22
+        timeout: 120
+
+    - name: Add new host to inventory
+      add_host:
+        name: new_vm
+        ansible_host: "{{ new_vm_ip }}"
+        ansible_user: <VM_SSH_USER>
+        ansible_ssh_private_key_file: ~/.ssh/id_rsa
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+        new_vm_name: "{{ new_vm_name }}"
+        new_vm_fqdn: "{{ new_vm_fqdn }}"
+        new_vm_ip: "{{ new_vm_ip }}"
+
+    - name: Write dynamic inventory for domain join
+      copy:
+        dest: dynamic_inventory.ini
+        content: |
+          [new_vm]
+          {{ new_vm_ip }} ansible_user=<VM_SSH_USER> ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+- name: Configure First Boot Tasks
+  hosts: new_vm
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Write FQDN hostname to file
+      copy:
+        dest: /etc/new_hostname
+        content: "{{ new_vm_fqdn }}"
+        mode: '0644'
+
+    - name: Copy first boot script
+      copy:
+        src: files/first_boot.sh
+        dest: /usr/local/bin/first_boot.sh
+        mode: '0755'
+
+    - name: Copy systemd service for first boot
+      copy:
+        src: files/firstboot.service
+        dest: /etc/systemd/system/firstboot.service
+        mode: '0644'
+
+    - name: Copy domain join script
+      copy:
+        src: files/domain_join.sh
+        dest: /usr/local/bin/domain_join.sh
+        mode: '0755'
+
+    - name: Copy systemd service for domain join
+      copy:
+        src: files/domainjoin.service
+        dest: /etc/systemd/system/domainjoin.service
+        mode: '0644'
+
+    - name: Enable domainjoin service (do not start yet)
+      systemd:
+        name: domainjoin.service
+        enabled: yes
+        state: stopped
+
+    - name: Enable firstboot service (don’t start in foreground)
+      systemd:
+        name: firstboot.service
+        enabled: yes
+        state: stopped
+
+    - name: Start firstboot service in background
+      shell: nohup systemctl start firstboot.service &
+      async: 1
+      poll: 0
+
+    - name: Notify Discord of VM creation (optional)
+      shell: |
+        echo "Provisioned {{ hostvars[inventory_hostname].new_vm_name }} with IP {{ hostvars[inventory_hostname].new_vm_ip }}" > /tmp/provisioned.log
+      changed_when: false
