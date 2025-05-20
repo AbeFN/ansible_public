@@ -1,6 +1,6 @@
-# Automated Debian/Ubuntu VM Provisioning & Active Directory Join with Ansible
+# Automated Debian/Ubuntu VM Provisioning & Active Directory Domain Join with Ansible
 
-A step-by-step, production-ready Ansible solution for provisioning Debian/Ubuntu VMs, performing first-boot configuration, and joining them to Active Directory, with Discord notifications. Designed for vSphere (VMware) environments.
+A step-by-step, production-ready Ansible solution for provisioning Debian/Ubuntu VMs, performing first-boot configuration, and joining them to Active Directory Domain, with Discord notifications. Designed for vSphere (VMware) environments.
 
 
 
